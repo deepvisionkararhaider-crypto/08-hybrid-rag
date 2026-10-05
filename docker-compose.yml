@@ -1,0 +1,29 @@
+services:
+  api:
+    build: .
+    image: multi-query-rag:latest
+    container_name: multi-query-rag
+    ports:
+      - "8000:8000"
+    environment:
+      # Offline-first defaults; override via .env to enable ML/LLM upgrades.
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-hashing}
+      VECTOR_STORE: ${VECTOR_STORE:-numpy}
+      MULTI_QUERY_PROVIDER: ${MULTI_QUERY_PROVIDER:-rule}
+      NUM_QUERIES: ${NUM_QUERIES:-5}
+      FUSION: ${FUSION:-rrf}
+      LLM_PROVIDER: ${LLM_PROVIDER:-extractive}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+      - ./index:/app/index
+      - ./frontend:/app/frontend:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

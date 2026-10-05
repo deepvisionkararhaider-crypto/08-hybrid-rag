@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hybrid RAG</title>
+<style>
+  :root{--bg:#0f172a;--panel:#1e293b;--panel2:#273449;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;
+    --accent:#38bdf8;--accent2:#818cf8;--green:#34d399;--amber:#fbbf24;--red:#f87171;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);line-height:1.55;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  header{padding:28px 24px 18px;border-bottom:1px solid var(--border);}
+  .wrap{max-width:1080px;margin:0 auto;}
+  h1{margin:0 0 6px;font-size:1.6rem;} h1 .tag{color:var(--accent);}
+  .sub{color:var(--muted);font-size:.95rem;margin:0;}
+  .badges{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;}
+  .badge{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:3px 11px;font-size:.78rem;}
+  main{max-width:1080px;margin:0 auto;padding:24px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media(max-width:860px){.grid{grid-template-columns:1fr;}}
+  section.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
+  h2{font-size:1.05rem;margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+  h2 .num{background:var(--accent2);color:#0b1220;border-radius:7px;width:22px;height:22px;
+    display:inline-flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;}
+  label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 5px;}
+  textarea,input[type=text],input[type=number]{width:100%;background:var(--panel2);border:1px solid var(--border);
+    color:var(--text);border-radius:9px;padding:10px 12px;font:inherit;font-size:.9rem;}
+  textarea{min-height:90px;resize:vertical;}
+  button{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#06121f;border:none;border-radius:9px;
+    padding:11px 18px;font-weight:700;font-size:.9rem;cursor:pointer;margin-top:16px;}
+  button:disabled{opacity:.55;cursor:not-allowed;}
+  .muted{color:var(--muted);font-size:.85rem;} .err{color:var(--red);font-size:.85rem;margin-top:8px;}
+  .answer{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;white-space:pre-wrap;font-size:.92rem;}
+  .src{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--panel2);}
+  .src .head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);margin-bottom:6px;}
+  .src .name{color:var(--accent);font-weight:600;}
+  .src .text{font-size:.85rem;max-height:110px;overflow:auto;margin-top:6px;}
+  .pill{display:inline-block;background:#0b1220;border:1px solid var(--border);border-radius:999px;padding:1px 8px;font-size:.72rem;margin:2px 4px 0 0;}
+  .pill.lex{color:var(--amber);border-color:var(--amber);} .pill.dense{color:var(--accent);border-color:var(--accent);}
+  .stat{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:.82rem;color:var(--muted);}
+  .stat b{color:var(--text);}
+  .doc{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem;}
+  .doc:last-child{border-bottom:none;} .hidden{display:none;}
+  footer{max-width:1080px;margin:0 auto;padding:8px 24px 40px;color:var(--muted);font-size:.8rem;}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1><span class="tag">08</span> · Hybrid RAG</h1>
+  <p class="sub">Lexical <b>BM25</b> + dense <b>semantic</b> retrieval, fused with <b>Reciprocal Rank Fusion</b>.</p>
+  <div class="badges"><span class="badge">FastAPI</span><span class="badge">BM25 (from scratch)</span>
+    <span class="badge">Dense embeddings</span><span class="badge">RRF</span><span class="badge">Citations</span></div>
+</div></header>
+
+<main class="grid">
+  <div>
+    <section class="card">
+      <h2><span class="num">1</span> Ingest documents</h2>
+      <label for="ingest-text">Paste text (TXT / Markdown)</label>
+      <textarea id="ingest-text" placeholder="Paste a document here..."></textarea>
+      <label for="ingest-source">Source name (optional)</label>
+      <input type="text" id="ingest-source" placeholder="e.g. error_codes.md" />
+      <button id="ingest-btn">Ingest text</button>
+      <label style="margin-top:16px">Or upload a file (.txt / .md / .pdf)</label>
+      <input type="file" id="ingest-file" accept=".txt,.md,.markdown,.pdf,.csv,.json,.rst" />
+      <div id="ingest-msg" class="muted" style="margin-top:10px"></div>
+    </section>
+    <section class="card">
+      <h2><span class="num">3</span> Indexed documents</h2>
+      <div id="docs"><span class="muted">Loading…</span></div>
+      <div class="stat" id="health"></div>
+    </section>
+  </div>
+
+  <div>
+    <section class="card">
+      <h2><span class="num">2</span> Ask a question</h2>
+      <label for="question">Question</label>
+      <textarea id="question" placeholder="How do I lower cloud costs?" ></textarea>
+      <label for="top-k">Final context chunks</label>
+      <input type="number" id="top-k" value="5" min="1" max="50" />
+      <button id="ask-btn">Hybrid search &amp; answer</button>
+      <div id="ask-msg" class="err"></div>
+    </section>
+    <section class="card hidden" id="answer-card">
+      <h2><span class="num">4</span> Answer</h2>
+      <div class="answer" id="answer"></div>
+    </section>
+    <section class="card hidden" id="sources-card">
+      <h2><span class="num">5</span> Sources (with retriever provenance)</h2>
+      <div id="sources"></div>
+    </section>
+  </div>
+</main>
+<footer>Hybrid RAG · portfolio project 08 · offline-first (hashing embedder, numpy store, extractive generator) with optional transformer/FAISS/LLM upgrade via environment variables.</footer>
+
+<script>
+const API = window.location.origin.replace(/\/ui$/, "");
+const $ = (id) => document.getElementById(id);
+async function api(path, opts){
+  const res = await fetch(API + path, opts);
+  if(!res.ok){ let d=res.statusText; try{ d=(await res.json()).detail||d; }catch(e){} throw new Error(d); }
+  return res.json();
+}
+async function refreshDocs(){
+  try{
+    const [docs, h] = await Promise.all([api("/documents"), api("/health")]);
+    $("docs").innerHTML = docs.length
+      ? docs.map(d=>`<div class="doc"><span class="name">${d.source_id}</span><span class="muted">${d.num_chunks} chunks</span></div>`).join("")
+      : '<span class="muted">No documents indexed yet.</span>';
+    $("health").innerHTML = `<span>embedder <b>${h.embedding_provider}</b></span>`+
+      `<span>store <b>${h.vector_store}</b></span>`+
+      `<span>fusion <b>${h.fusion}</b></span>`+
+      `<span>bm25 k1 <b>${h.bm25_k1}</b> b <b>${h.bm25_b}</b></span>`+
+      `<span>chunks <b>${h.chunks}</b></span>`;
+  }catch(e){ $("docs").innerHTML = `<span class="err">${e.message}</span>`; }
+}
+$("ingest-btn").onclick = async () => {
+  const text = $("ingest-text").value.trim(); if(!text){ $("ingest-msg").textContent="Enter text first."; return; }
+  try{
+    $("ingest-msg").textContent="Ingesting…";
+    const r = await api("/ingest",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text, source_id:$("ingest-source").value.trim()||null})});
+    $("ingest-msg").textContent=`Ingested '${r.source_id}' → ${r.num_chunks} chunks.`;
+    $("ingest-text").value=""; $("ingest-source").value=""; refreshDocs();
+  }catch(e){ $("ingest-msg").innerHTML=`<span class="err">${e.message}</span>`; }
+};
+$("ingest-file").onchange = async (ev) => {
+  const f = ev.target.files[0]; if(!f) return;
+  const fd = new FormData(); fd.append("file", f);
+  try{
+    $("ingest-msg").textContent="Uploading…";
+    const r = await api("/ingest/file",{method:"POST",body:fd});
+    $("ingest-msg").textContent=`Ingested '${r.source_id}' → ${r.num_chunks} chunks.`;
+    ev.target.value=""; refreshDocs();
+  }catch(e){ $("ingest-msg").innerHTML=`<span class="err">${e.message}</span>`; }
+};
+$("ask-btn").onclick = async () => {
+  const question = $("question").value.trim(); if(!question){ $("ask-msg").textContent="Enter a question."; return; }
+  $("ask-msg").textContent=""; $("ask-btn").disabled=true; $("ask-btn").textContent="Working…";
+  try{
+    const r = await api("/query",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({question, top_k: parseInt($("top-k").value,10)||5})});
+    $("answer-card").classList.remove("hidden"); $("answer").textContent=r.answer;
+    $("sources-card").classList.remove("hidden");
+    $("sources").innerHTML = r.sources.length ? r.sources.map(s=>{
+      const loc = s.page ? `page ${s.page}` : `chunk ${s.chunk_index}`;
+      const pills = s.retrieved_by.map(x=>`<span class="pill ${x==='lexical'?'lex':'dense'}">${x}</span>`).join("");
+      return `<div class="src"><div class="head">
+        <span><b>${s.rank}.</b> <span class="name">${s.source_id}</span> — ${loc}</span>
+        <span>fused ${s.fused_score.toFixed(4)} · bm25 ${s.bm25_score.toFixed(2)} · dense ${s.dense_score.toFixed(3)}</span></div>
+        <div class="text">${(s.text||'').slice(0,320)}${(s.text||'').length>320?'…':''}</div>
+        <div style="margin-top:6px">${pills}</div></div>`;
+    }).join("") : '<span class="muted">No sources retrieved.</span>';
+    $("ask-msg").textContent = `lexical candidates ${r.lexical_candidates} · dense candidates ${r.dense_candidates} · unique ${r.unique_after_fusion}`;
+  }catch(e){ $("ask-msg").textContent=e.message; }
+  finally{ $("ask-btn").disabled=false; $("ask-btn").textContent="Hybrid search & answer"; }
+};
+refreshDocs();
+</script>
+</body>
+</html>

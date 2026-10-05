@@ -1,0 +1,10 @@
+# Core runtime dependencies. The app runs end-to-end with ONLY these installed,
+# using deterministic offline backends (no heavy ML downloads, no API keys needed).
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+numpy==2.2.1
+python-multipart==0.0.20
+pypdf==5.1.0
+httpx==0.28.1

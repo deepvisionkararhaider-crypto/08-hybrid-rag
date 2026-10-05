@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.git/
+.gitignore
+data/*.json
+index/
+.env
+.env.*
+*.tar.gz
+*.zip
+*.bak

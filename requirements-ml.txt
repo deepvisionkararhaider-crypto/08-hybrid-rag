@@ -1,0 +1,5 @@
+# Optional ML extras: real semantic embeddings + FAISS vector index.
+# Install with: pip install -r requirements-ml.txt
+# The app auto-detects these and upgrades from the offline backends.
+sentence-transformers==3.3.1
+faiss-cpu==1.9.0.post1
